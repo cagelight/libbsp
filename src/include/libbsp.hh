@@ -1,9 +1,7 @@
 #pragma once
 
 #include "libbsp_version.hh"
-
-#include <cstdint>
-#include <cstdlib>
+#include "libbsp_fmt.hh"
 
 #include <memory>
 #include <string_view>
@@ -24,10 +22,11 @@ namespace libbsp {
 		// RETRIEVAL
 		
 		std::string_view entities() const;
+		gsl::span<fmt::BSP_Shader const> shaders() const;
 		
 	private:
 		
-		uint8_t const * m_base = nullptr;
+		fmt::BSP_Header const * m_base = nullptr;
 		
 	};
 	

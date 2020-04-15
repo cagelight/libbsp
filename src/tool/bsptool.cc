@@ -3,6 +3,7 @@
 
 #include <unistd.h>
 
+#include <bitset>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -11,8 +12,10 @@
 int main(int argc, char * * argv) {
 	
 	argagg::parser argp {{
-		{ "help", { "-h", "--help" }, "Show this help message", 0 },
-		{ "ents", { "-e", "--ents" }, "Print the entity string", 0 },
+		{ "help",    { "-h", "--help" }, "Show this help message", 0 },
+		{ "verbose", { "-v", "--verbose" }, "Print additional info if available", 0 },
+		{ "ents",    { "-e", "--ents" }, "Print the entity string", 0 },
+		{ "shaders", { "-s", "--shaders" }, "Print the surface shaders", 0 },
 	}};
 	
 	argagg::parser_results args;
@@ -55,7 +58,31 @@ int main(int argc, char * * argv) {
 	libbsp::BSP_Reader bspr {data.data()};
 	
 	if (args["ents"]) {
-		std::cout << bspr.entities() << std::endl;
+		std::cout << bspr.entities();
+		std::flush(std::cout);
+	}
+	
+	if (args["shaders"]) {
+		auto shads = bspr.shaders();
+		for (auto const & shad : shads) {
+			std::cout << shad.shader << std::endl;
+			if (args["verbose"]) {
+				std::cout 
+					<< "Content Flags: " 
+					<< std::bitset<32> {static_cast<size_t>(shad.content_flags)} 
+					<< " ( "
+					<< static_cast<size_t>(shad.content_flags)
+					<< " )"
+					<< std::endl
+					<< "Surface Flags: " 
+					<< std::bitset<32> {static_cast<size_t>(shad.surface_flags)} 
+					<< " ( "
+					<< static_cast<size_t>(shad.surface_flags)
+					<< " )"
+					<< std::endl
+					<< std::endl;
+			}
+		}
 	}
 	
 	return 0;
