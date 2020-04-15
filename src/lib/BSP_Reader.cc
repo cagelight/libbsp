@@ -37,3 +37,7 @@ gsl::span<BSP_Shader const> BSP_Reader::shaders() const {
 gsl::span<fmt::BSP_Plane const> BSP_Reader::planes() const {
 	return m_base->get_data_span<BSP_Plane const>(Lump::PLANES);
 }
+
+gsl::span<fmt::BSP_Node const> BSP_Reader::nodes() const {
+	return m_base->get_data_span<BSP_Node const>(Lump::NODES);
+}

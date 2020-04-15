@@ -79,4 +79,10 @@ namespace libbsp::fmt {
 		float dist;
 	};
 	
+	struct alignas(4) BSP_Node {
+		int32_t plane_idx;
+		int32_t children[2];
+		int32_t mins[3];
+		int32_t maxs[3];
+	};
 }

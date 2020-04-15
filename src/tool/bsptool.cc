@@ -89,6 +89,7 @@ int main(int argc, char * * argv) {
 			<< bspr.entities().size() << " entity string bytes" << std::endl
 			<< bspr.shaders().size() << " shaders" << std::endl
 			<< bspr.planes().size() << " planes" << std::endl
+			<< bspr.nodes().size() << " nodes" << std::endl
 		;
 	}
 	
