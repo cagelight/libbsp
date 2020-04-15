@@ -1,10 +1,13 @@
 #include "libbsp.hh"
 #include "argagg.hh"
 
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 #include <bitset>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -16,6 +19,7 @@ int main(int argc, char * * argv) {
 		{ "verbose", { "-v", "--verbose" }, "Print additional info if available", 0 },
 		{ "ents",    { "-e", "--ents" }, "Print the entity string", 0 },
 		{ "shaders", { "-s", "--shaders" }, "Print the surface shaders", 0 },
+		{ "info",    { "-i", "--info" }, "Print general info", 0 },
 	}};
 	
 	argagg::parser_results args;
@@ -32,30 +36,25 @@ int main(int argc, char * * argv) {
 		return 0;
 	}
 	
-	std::filesystem::path bsp_path = args.as<std::string>(0);
+	std::string bsp_path = args.as<std::string>(0);
+	auto fd = open( bsp_path.c_str(), O_RDONLY );
 	
-	if (!std::filesystem::exists(bsp_path)) {
+	if (fd == -1) {
 		std::cerr << "File not found!" << std::endl;
 		return 1;
 	}
 	
-	auto length = std::filesystem::file_size(bsp_path);
+	struct stat sb;
+	fstat(fd, &sb);
 	
-	if (!length) {
-		std::cerr << "Empty file!" << std::endl;
+	if (sb.st_size < (ssize_t)sizeof(libbsp::fmt::BSP_Header)) {
+		std::cerr << "File too small to be a BSP file!" << std::endl;
 		return 1;
 	}
+
+	auto ptr = mmap(nullptr, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	
-	std::ifstream file { bsp_path, std::ios::binary };
-	std::vector<uint8_t> data (length);
-	
-	file.read( reinterpret_cast<char *>(data.data()), length );
-	if(!file.good()) {
-		std::cerr << "Failed to read file!" << std::endl;
-		return 1;
-	}
-	
-	libbsp::BSP_Reader bspr {data.data()};
+	libbsp::BSP_Reader bspr { reinterpret_cast<uint8_t const *> (ptr) };
 	
 	if (args["ents"]) {
 		std::cout << bspr.entities();
@@ -83,6 +82,14 @@ int main(int argc, char * * argv) {
 					<< std::endl;
 			}
 		}
+	}
+	
+	if (args["info"]) {
+		std::cout
+			<< bspr.entities().size() << " entity string bytes" << std::endl
+			<< bspr.shaders().size() << " shaders" << std::endl
+			<< bspr.planes().size() << " planes" << std::endl
+		;
 	}
 	
 	return 0;

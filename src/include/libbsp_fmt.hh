@@ -74,4 +74,9 @@ namespace libbsp::fmt {
 		int32_t content_flags;
 	};
 	
+	struct alignas(4) BSP_Plane {
+		float normal[3];
+		float dist;
+	};
+	
 }

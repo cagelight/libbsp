@@ -23,6 +23,7 @@ namespace libbsp {
 		
 		std::string_view entities() const;
 		gsl::span<fmt::BSP_Shader const> shaders() const;
+		gsl::span<fmt::BSP_Plane const> planes() const;
 		
 	private:
 		

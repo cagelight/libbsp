@@ -33,3 +33,7 @@ std::string_view BSP_Reader::entities() const {
 gsl::span<BSP_Shader const> BSP_Reader::shaders() const {
 	return m_base->get_data_span<BSP_Shader const>(Lump::SHADERS);
 }
+
+gsl::span<fmt::BSP_Plane const> BSP_Reader::planes() const {
+	return m_base->get_data_span<BSP_Plane const>(Lump::PLANES);
+}
