@@ -11,15 +11,16 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <unordered_map>
 
 int main(int argc, char * * argv) {
 	
 	argagg::parser argp {{
-		{ "help",    { "-h", "--help" }, "Show this help message", 0 },
-		{ "verbose", { "-v", "--verbose" }, "Print additional info if available", 0 },
-		{ "ents",    { "-e", "--ents" }, "Print the entity string", 0 },
-		{ "shaders", { "-s", "--shaders" }, "Print the surface shaders", 0 },
-		{ "info",    { "-i", "--info" }, "Print general info", 0 },
+		{ "help",     { "-h", "--help" }, "Show this help message", 0 },
+		{ "info",     { "-i", "--info" }, "Print general info", 0 },
+		{ "ents",     { "-e", "--ents" }, "Print the entity string", 0 },
+		{ "shaders",  { "-s", "--shaders" }, "Print the shaders used", 0 },
+		{ "shaders+", { "-S", "--shaders-extra" }, "Print the shaders used plus extra information", 0 },
 	}};
 	
 	argagg::parser_results args;
@@ -47,14 +48,92 @@ int main(int argc, char * * argv) {
 	struct stat sb;
 	fstat(fd, &sb);
 	
-	if (sb.st_size < (ssize_t)sizeof(libbsp::fmt::BSP_Header)) {
+	if (sb.st_size < (ssize_t)sizeof(BSP::Header)) {
 		std::cerr << "File too small to be a BSP file!" << std::endl;
 		return 1;
 	}
 
 	auto ptr = mmap(nullptr, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	
-	libbsp::BSP_Reader bspr { reinterpret_cast<uint8_t const *> (ptr) };
+	if (memcmp(ptr, BSP::IDENT, 4)) {
+		std::cerr << "File does not appear to be a BSP file!" << std::endl;
+		return 1;
+	}
+	
+	BSP::Reader bspr { reinterpret_cast<uint8_t const *> (ptr) };
+	
+	if (args["info"]) {
+		
+		std::unordered_map<BSP::SurfaceType, uint_fast32_t> surface_type_uage;
+		for (auto const & surf : bspr.surfaces()) surface_type_uage[surf.type]++;
+		
+		std::cout
+			<< sb.st_size << " byte BSP file" << std::endl
+			<< bspr.entities().size() << " entity string bytes" << std::endl
+			
+			<< bspr.shaders().size() << " shaders"
+			<< " (" << bspr.shaders().size_bytes() << " bytes" << ")" 
+			<< std::endl
+			
+			<< bspr.planes().size() << " planes"
+			<< " (" << bspr.planes().size_bytes() << " bytes" << ")" 
+			<< std::endl
+			
+			<< bspr.nodes().size() << " nodes" 
+			<< " (" << bspr.nodes().size_bytes() << " bytes" << ")" 
+			<< std::endl
+			
+			<< bspr.leafs().size() << " leafs"
+			<< " (" << bspr.leafs().size_bytes() << " bytes" << ")" 
+			<< std::endl
+			
+			<< bspr.leafsurfaces().size() << " leafsurfaces"
+			<< " (" << bspr.leafsurfaces().size_bytes() << " bytes" << ")" 
+			<< std::endl
+			
+			<< bspr.leafbrushes().size() << " leafbrushes"
+			<< " (" << bspr.leafbrushes().size_bytes() << " bytes" << ")" 
+			<< std::endl
+			
+			<< bspr.models().size() << " models"
+			<< " (" << bspr.models().size_bytes() << " bytes" << ")" 
+			<< std::endl
+			
+			<< bspr.brushes().size() << " brushes"
+			<< " (" << bspr.brushes().size_bytes() << " bytes" << ")" 
+			<< std::endl
+			
+			<< bspr.brushsides().size() << " brushsides"
+			<< " (" << bspr.brushsides().size_bytes() << " bytes" << ")" 
+			<< std::endl
+			
+			<< bspr.drawverts().size() << " drawverts"
+			<< " (" << bspr.drawverts().size_bytes() << " bytes" << ")" 
+			<< std::endl
+			
+			<< bspr.drawindices().size() << " drawindexes"
+			<< " (" << bspr.drawindices().size_bytes() << " bytes" << ")" 
+			<< std::endl
+			
+			<< bspr.fogs().size() << " fogs"
+			<< " (" << bspr.fogs().size_bytes() << " bytes" << ")" 
+			<< std::endl
+			
+			<< bspr.surfaces().size() << " surfaces"
+			<< " (" << bspr.surfaces().size_bytes() << " bytes" << ")" 
+			<< std::endl
+			<< "    "
+			<< surface_type_uage[BSP::SurfaceType::PLANAR] << " planars, "
+			<< surface_type_uage[BSP::SurfaceType::PATCH] << " patches, "
+			<< surface_type_uage[BSP::SurfaceType::TRISOUP] << " trisoups, "
+			<< surface_type_uage[BSP::SurfaceType::FLARE] << " flares"
+			<< std::endl
+			
+			<< bspr.lightmaps().size() << " lightmaps"
+			<< " (" << bspr.lightmaps().size_bytes() << " bytes" << ")" 
+			<< std::endl
+		;
+	}
 	
 	if (args["ents"]) {
 		std::cout << bspr.entities();
@@ -62,35 +141,43 @@ int main(int argc, char * * argv) {
 	}
 	
 	if (args["shaders"]) {
-		auto shads = bspr.shaders();
-		for (auto const & shad : shads) {
-			std::cout << shad.shader << std::endl;
-			if (args["verbose"]) {
-				std::cout 
-					<< "Content Flags: " 
-					<< std::bitset<32> {static_cast<size_t>(shad.content_flags)} 
-					<< " ( "
-					<< static_cast<size_t>(shad.content_flags)
-					<< " )"
-					<< std::endl
-					<< "Surface Flags: " 
-					<< std::bitset<32> {static_cast<size_t>(shad.surface_flags)} 
-					<< " ( "
-					<< static_cast<size_t>(shad.surface_flags)
-					<< " )"
-					<< std::endl
-					<< std::endl;
-			}
-		}
+		for (auto const & shad : bspr.shaders()) std::cout << shad.shader << std::endl;
 	}
 	
-	if (args["info"]) {
-		std::cout
-			<< bspr.entities().size() << " entity string bytes" << std::endl
-			<< bspr.shaders().size() << " shaders" << std::endl
-			<< bspr.planes().size() << " planes" << std::endl
-			<< bspr.nodes().size() << " nodes" << std::endl
-		;
+	if (args["shaders+"]) {
+		
+		auto shads = bspr.shaders();
+		
+		std::unordered_map<int32_t, uint32_t> brush_usage;
+		for (auto const & v : bspr.brushes()) brush_usage[v.shader]++;
+		
+		std::unordered_map<int32_t, uint32_t> brushside_usage;
+		for (auto const & v : bspr.brushsides()) brushside_usage[v.shader]++;
+		
+		std::unordered_map<int32_t, uint32_t> surface_usage;
+		for (auto const & v : bspr.surfaces()) surface_usage[v.shader]++;
+		
+		for (ssize_t i = 0; i < shads.size(); i++) {
+			auto const & shad = shads[i];
+			std::cout 
+				<< "Shader Path:     " << shad.shader 
+				<< std::endl
+				<< "Brush Usage:     " << brush_usage[i]
+				<< std::endl
+				<< "Brushside Usage: " << brushside_usage[i]
+				<< std::endl
+				<< "Surface Usage:   " << surface_usage[i]
+				<< std::endl
+				<< "Content Flags:   " 
+				<< std::bitset<32> {static_cast<size_t>(shad.content_flags)} 
+				<< " ( " << static_cast<size_t>(shad.content_flags) << " )"
+				<< std::endl
+				<< "Surface Flags:   "
+				<< std::bitset<32> {static_cast<size_t>(shad.surface_flags)}
+				<< " ( " << static_cast<size_t>(shad.surface_flags) << " )"
+				<< std::endl
+				<< std::endl;
+		}
 	}
 	
 	return 0;
