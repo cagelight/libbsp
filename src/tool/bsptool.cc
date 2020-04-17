@@ -9,6 +9,7 @@
 
 #include <bitset>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -97,12 +98,29 @@ int main(int argc, char * * argv) {
 			
 			<< bspr.models().size() << " models"
 			<< " (" << bspr.models().size_bytes() << " bytes" << ")" 
-			<< std::endl
+			<< std::endl;
 			
+		uint64_t total_side_refs = 0;
+		int32_t highest_side_count = 0;
+		
+		for (auto b : bspr.brushes()) {
+			total_side_refs += b.num_sides;
+			if (b.num_sides > highest_side_count) highest_side_count = b.num_sides;
+		}
+		
+		std::cout
 			<< bspr.brushes().size() << " brushes"
 			<< " (" << bspr.brushes().size_bytes() << " bytes" << ")" 
 			<< std::endl
+			<< "    "
+			<< "highest number of sides: "
+			<< highest_side_count
+			<< ", average side count: "
+			<< std::setprecision(4)
+			<< static_cast<double>(total_side_refs) / bspr.brushes().size()
+			<< std::endl;
 			
+		std::cout
 			<< bspr.brushsides().size() << " brushsides"
 			<< " (" << bspr.brushsides().size_bytes() << " bytes" << ")" 
 			<< std::endl
@@ -131,6 +149,29 @@ int main(int argc, char * * argv) {
 			
 			<< bspr.lightmaps().size() << " lightmaps"
 			<< " (" << bspr.lightmaps().size_bytes() << " bytes" << ")" 
+			<< std::endl
+			
+			<< bspr.lightgrids().size() << " lightgrid elements"
+			<< " (" << bspr.lightgrids().size_bytes() << " bytes" << ")" 
+			<< std::endl
+		;
+		
+		if (bspr.has_visibility()) {
+			std::cout
+				<< bspr.visibility().data.size() << " bytes of visibility data"
+				<< std::endl
+				<< "    "
+				<< bspr.visibility().header.clusters << " clusters, "
+				<< bspr.visibility().header.cluster_bytes << " bytes per cluster"
+				<< std::endl
+			;
+		} else {
+			std::cout << "no visibility data" << std::endl;
+		}
+			
+		std::cout
+			<< bspr.lightarray().size() << " lightarray elements"
+			<< " (" << bspr.lightarray().size_bytes() << " bytes" << ")" 
 			<< std::endl
 		;
 	}

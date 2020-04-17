@@ -1,7 +1,7 @@
 #pragma once
 
 #include "libbsp_version.hh"
-#include "libbsp_fmt.hh"
+#include "libbsp/file_fmt.hh"
 
 // FIXME -- replace with std::span when C++20 rolls around
 #include <gsl/span>
@@ -11,6 +11,11 @@
 #include <vector>
 
 namespace BSP {
+	
+	struct Visibility {
+		VisibilityHeader const & header;
+		gsl::span<uint8_t const> data;
+	};
 	
 	struct Reader {
 		
@@ -25,9 +30,6 @@ namespace BSP {
 			m_base = reinterpret_cast<Header const *> (base);
 		}
 		
-		// ================================
-		// RETRIEVAL
-		
 		inline Lump const & get_lump(LumpIndex lump_num) const {
 			return m_base->lumps[static_cast<size_t>(lump_num)];
 		}
@@ -41,17 +43,27 @@ namespace BSP {
 			Lump const & lump = get_lump(lump_num);
 			return std::string_view {
 				reinterpret_cast<char const *>(reinterpret_cast<uint8_t const *>(m_base) + lump.offs),
-				static_cast<size_t>(lump.filelen)
+				static_cast<size_t>(lump.size)
 			};
 		}
 		
-		template <typename T> gsl::span<T> get_data_span(LumpIndex lump_num) const {
+		template <typename T> gsl::span<T> get_data_span(LumpIndex lump_num, size_t offset = 0) const {
 			Lump const & lump = get_lump(lump_num);
 			return gsl::span<T> {
-				reinterpret_cast<T const *>(reinterpret_cast<uint8_t const *>(m_base) + lump.offs),
-				static_cast<ssize_t>(lump.filelen / sizeof(T))
+				reinterpret_cast<T const *>(reinterpret_cast<uint8_t const *>(m_base) + lump.offs + offset),
+				static_cast<ssize_t>(lump.size / sizeof(T) - offset)
 			};
 		}
+		
+		// ================================
+		// CHECKS
+		
+		inline bool has_visibility() const {
+			return get_lump(LumpIndex::VISIBILITY).size;
+		}
+		
+		// ================================
+		// RETRIEVAL
 		
 		inline std::string_view entities() const {
 			return get_string_view(LumpIndex::ENTITIES);
@@ -111,6 +123,45 @@ namespace BSP {
 		
 		inline gsl::span<Lightmap const> lightmaps() const {
 			return get_data_span<Lightmap const>(LumpIndex::LIGHTMAPS);
+		}
+		
+		inline gsl::span<Lightgrid const> lightgrids() const {
+			return get_data_span<Lightgrid const>(LumpIndex::LIGHTGRID);
+		}
+		
+		// ================================
+		// VISIBILITY
+		
+		struct VisibilityCluster {
+			gsl::span<uint8_t const> data;
+			
+			inline bool can_see(int32_t other_cluster) {
+				// (other_cluster >> 3) determines which byte that cluster is in
+				// (1 << (other_cluster & 7)) determines which bit of that byte is the vis for that cluster
+				// this function is basically a faster way to do the following:
+				//     size_t cluster_byte = other_cluster / 8;
+				//     size_t cluster_bit  = other_cluster % 8;
+				//     return data[cluster_byte] & (1 << cluster_bit);
+				return data[other_cluster >> 3] & (1 << (other_cluster & 7));
+			}
+		};
+		
+		inline Visibility visibility() const {
+			return Visibility {
+				*get_data<VisibilityHeader const>(LumpIndex::VISIBILITY),
+				get_data_span<uint8_t const>(LumpIndex::VISIBILITY, sizeof(VisibilityHeader))
+			};
+		}
+		
+		inline VisibilityCluster visibility_cluster(int32_t idx) const {
+			auto vis = visibility();
+			return VisibilityCluster { gsl::span<uint8_t const> { vis.data.data() + vis.header.cluster_bytes * idx, vis.header.cluster_bytes }};
+		}
+		
+		// ================================
+		
+		inline gsl::span<uint16_t const> lightarray() const {
+			return get_data_span<uint16_t const>(LumpIndex::LIGHTARRAY);
 		}
 		
 	private:

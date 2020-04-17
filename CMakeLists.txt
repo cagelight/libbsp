@@ -38,3 +38,5 @@ target_link_libraries( bsptool PUBLIC libbsp )
 install( TARGETS bsptool RUNTIME DESTINATION "bin" )
 
 install( FILES "${CMAKE_SOURCE_DIR}/src/include/libbsp.hh" DESTINATION "include" )
+install( FILES "${CMAKE_BINARY_DIR}/include/libbsp_version.hh" DESTINATION "include" )
+install( DIRECTORY "${CMAKE_SOURCE_DIR}/src/include/libbsp" DESTINATION "include" )
