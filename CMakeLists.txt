@@ -22,7 +22,11 @@ file( GLOB_RECURSE LIB_FILES
 )
 
 add_library( libbsp SHARED ${LIB_FILES} )
-set_target_properties( libbsp PROPERTIES PREFIX "" )
+set_target_properties( libbsp PROPERTIES
+	PREFIX ""
+	SOVERSION 0
+	VERSION   ${PROJECT_VERSION}
+)
 install( TARGETS libbsp LIBRARY DESTINATION "lib" )
 
 file( GLOB_RECURSE TOOL_FILES 
@@ -30,10 +34,6 @@ file( GLOB_RECURSE TOOL_FILES
 )
 
 add_executable( bsptool ${TOOL_FILES} )
-set_target_properties( libbsp PROPERTIES
-	SOVERSION 0
-	VERSION   ${PROJECT_VERSION}
-)
 target_link_libraries( bsptool PUBLIC libbsp )
 install( TARGETS bsptool RUNTIME DESTINATION "bin" )
 

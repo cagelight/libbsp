@@ -11,17 +11,20 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <string>
 #include <unordered_map>
 
 int main(int argc, char * * argv) {
 	
 	argagg::parser argp {{
-		{ "help",     { "-h", "--help" }, "Show this help message", 0 },
-		{ "info",     { "-i", "--info" }, "Print general info", 0 },
-		{ "ents",     { "-e", "--ents" }, "Print the entity string", 0 },
-		{ "shaders",  { "-s", "--shaders" }, "Print the shaders used", 0 },
-		{ "shaders+", { "-S", "--shaders-extra" }, "Print the shaders used plus extra information", 0 },
+		{ "help",      { "-h", "--help" }, "Show this help message", 0 },
+		{ "info",      { "-i", "--info" }, "Print general info", 0 },
+		{ "entstr",    { "-e", "--entstring" }, "Print the entity string", 0 },
+		{ "ents",      { "-E", "--ents" }, "Print information about the entities", 0 },
+		{ "shaders",   { "-s", "--shaders" }, "Print the shaders used", 0 },
+		{ "shaders+",  { "-S", "--shaders-extra" }, "Print the shaders used plus extra information", 0 },
+		{ "reprocess", { "-r", "--reprocess" }, "Load the BSP and resave it", 1 },
 	}};
 	
 	argagg::parser_results args;
@@ -55,13 +58,12 @@ int main(int argc, char * * argv) {
 	}
 
 	auto ptr = mmap(nullptr, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	BSP::Reader bspr { reinterpret_cast<uint8_t const *> (ptr) };
 	
-	if (memcmp(ptr, BSP::IDENT, 4)) {
+	if (bspr.header().ident != BSP::IDENT) {
 		std::cerr << "File does not appear to be a BSP file!" << std::endl;
 		return 1;
 	}
-	
-	BSP::Reader bspr { reinterpret_cast<uint8_t const *> (ptr) };
 	
 	if (args["info"]) {
 		
@@ -176,9 +178,33 @@ int main(int argc, char * * argv) {
 		;
 	}
 	
-	if (args["ents"]) {
+	if (args["entstr"]) {
 		std::cout << bspr.entities();
 		std::flush(std::cout);
+	}
+	
+	if (args["ents"]) {
+		auto ents = bspr.entities_parsed();
+		
+		std::cout << ents.size() << " entities" << std::endl;
+		
+		size_t classless = 0;
+		std::map<meadow::istring_view, std::vector<BSP::Reader::Entity const *>> classnames;
+		for (auto const & ent : ents) {
+			auto iter = ent.find(meadow::istring_view("classname"));
+			if (iter == ent.end()) {
+				classless++;
+				continue;
+			} else {
+				classnames[iter->second].emplace_back(&ent);
+			}
+		}
+		
+		std::cout << "classes:" << std::endl;
+		for (auto const & cl : classnames) std::cout << "    " << cl.first << ": " << cl.second.size() << std::endl;
+		if (classless) {
+			std::cout << "    " << classless << " classless entities" << std::endl;
+		}
 	}
 	
 	if (args["shaders"]) {
@@ -219,6 +245,20 @@ int main(int argc, char * * argv) {
 				<< std::endl
 				<< std::endl;
 		}
+	}
+	
+	if (args["reprocess"]) {
+		BSP::LumpProviderPtr pprov = std::make_shared<BSP::BSPReaderLumpProvider>(bspr);
+		BSP::Assembler bspa { pprov };
+		auto bytes = bspa.assemble();
+		
+		std::ofstream f { (std::string) args["reprocess"][0], std::ios_base::binary | std::ios_base::out };
+		if (!f.good()) {
+			// TODO error
+			return 1;
+		}
+		f.write( reinterpret_cast<char const *>(bytes.data()), bytes.size());
+		f.close();
 	}
 	
 	return 0;

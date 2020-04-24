@@ -14,7 +14,7 @@ namespace BSP {
 	static_assert(sizeof(Lump) == 8);
 	struct alignas(8) Header {
 
-		int32_t              ident;   // see IDENT, checked to make sure file is a BSP file
+		ident_t              ident;   // see IDENT, checked to make sure file is a BSP file
 		int32_t              version; // see VERSION, no other versions are known
 		std::array<Lump, 18> lumps;   // lumps, see the LumpIndex enum
 	};

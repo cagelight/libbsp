@@ -1,11 +1,13 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <cstdlib>
 
 namespace BSP {
 
-	static constexpr char     IDENT[4] = { 'R', 'B', 'S', 'P' };
+	using ident_t = std::array<char, 4>;
+	static constexpr ident_t  IDENT = { 'R', 'B', 'S', 'P' };
 	static constexpr int32_t  VERSION = 1;
 	static constexpr uint32_t PATH_LENGTH = 64;
 	
