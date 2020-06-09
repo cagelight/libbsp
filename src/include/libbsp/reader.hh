@@ -4,12 +4,10 @@
 
 #include <meadow/istring.hh>
 
-// FIXME -- replace with std::span when C++20 rolls around
-#include <gsl/span>
-
-#include <memory>
-#include <string_view>
 #include <map>
+#include <memory>
+#include <span>
+#include <string_view>
 #include <vector>
 
 namespace BSP {
@@ -51,11 +49,11 @@ namespace BSP {
 			};
 		}
 		
-		template <typename T = uint8_t> gsl::span<T> get_data_span(LumpIndex lump_num, size_t offset = 0) const {
+		template <typename T = uint8_t> std::span<T> get_data_span(LumpIndex lump_num, size_t offset = 0) const {
 			Lump const & lump = get_lump(lump_num);
-			return gsl::span<T> {
+			return std::span<T> {
 				reinterpret_cast<T const *>(reinterpret_cast<uint8_t const *>(m_base) + lump.offs + offset),
-				static_cast<ssize_t>(lump.size / sizeof(T) - offset)
+				lump.size / sizeof(T) - offset
 			};
 		}
 		
@@ -84,105 +82,129 @@ namespace BSP {
 		// ================================
 		// SHADERS
 		
-		inline gsl::span<Shader const> shaders() const {
+		using ShaderArray = std::span<Shader const>;
+		
+		inline ShaderArray shaders() const {
 			return get_data_span<Shader const>(LumpIndex::SHADERS);
 		}
 		
 		// ================================
 		// PLANES
+		
+		using PlaneArray = std::span<Plane const>;
 
-		inline gsl::span<Plane const> planes() const {
+		inline PlaneArray planes() const {
 			return get_data_span<Plane const>(LumpIndex::PLANES);
 		}
 		
 		// ================================
 		// NODES
 
-		inline gsl::span<Node const> nodes() const {
+		using NodeArray = std::span<Node const>;
+
+		inline NodeArray nodes() const {
 			return get_data_span<Node const>(LumpIndex::NODES);
 		}
 		
 		// ================================
 		// LEAFS
 		
-		inline gsl::span<Leaf const> leafs() const {
+		inline std::span<Leaf const> leafs() const {
 			return get_data_span<Leaf const>(LumpIndex::LEAFS);
 		}
 		
 		// ================================
 		// LEAFSURFACES
 		
-		inline gsl::span<int32_t const> leafsurfaces() const {
+		inline std::span<int32_t const> leafsurfaces() const {
 			return get_data_span<int32_t const>(LumpIndex::LEAFSURFACES);
 		}
 		
 		// ================================
 		// LEAFBRUSHES
 		
-		inline gsl::span<int32_t const> leafbrushes() const {
+		inline std::span<int32_t const> leafbrushes() const {
 			return get_data_span<int32_t const>(LumpIndex::LEAFBRUSHES);
 		}
 		
 		// ================================
 		// MODELS
 		
-		inline gsl::span<Model const> models() const {
+		using ModelArray = std::span<Model const>;
+
+		inline ModelArray models() const {
 			return get_data_span<Model const>(LumpIndex::MODELS);
 		}
 		
 		// ================================
 		// BRUSHES
+
+		using BrushArray = std::span<Brush const>;
 		
-		inline gsl::span<Brush const> brushes() const {
+		inline BrushArray brushes() const {
 			return get_data_span<Brush const>(LumpIndex::BRUSHES);
 		}
 		
 		// ================================
 		// BRUSHSIDES
+
+		using BrushSideArray = std::span<BrushSide const>;
 		
-		inline gsl::span<BrushSide const> brushsides() const {
+		inline BrushSideArray brushsides() const {
 			return get_data_span<BrushSide const>(LumpIndex::BRUSHSIDES);
 		}
 		
 		// ================================
 		// DRAWVERTS
 		
-		inline gsl::span<DrawVert const> drawverts() const {
+		using VertexArray = std::span<DrawVert const>;
+		
+		inline VertexArray drawverts() const {
 			return get_data_span<DrawVert const>(LumpIndex::DRAWVERTS);
 		}
 		
 		// ================================
 		// DRAWINDEXES
 		
-		inline gsl::span<int32_t const> drawindices() const {
+		using IndexArray = std::span<int32_t const>;
+		
+		inline IndexArray drawindices() const {
 			return get_data_span<int32_t const>(LumpIndex::DRAWINDEXES);
 		}
 		
 		// ================================
 		// FOGS
 		
-		inline gsl::span<Fog const> fogs() const {
+		using FogArray = std::span<Fog const>;
+		
+		inline FogArray fogs() const {
 			return get_data_span<Fog const>(LumpIndex::FOGS);
 		}
 		
 		// ================================
 		// SURFACES
 		
-		inline gsl::span<Surface const> surfaces() const {
+		using SurfaceArray = std::span<Surface const>;
+		
+		inline SurfaceArray surfaces() const {
 			return get_data_span<Surface const>(LumpIndex::SURFACES);
 		}
 		
 		// ================================
 		// LIGHTMAPS
 		
-		inline gsl::span<Lightmap const> lightmaps() const {
+		using LightmapArray = std::span<Lightmap const>;
+		
+		inline LightmapArray lightmaps() const {
 			return get_data_span<Lightmap const>(LumpIndex::LIGHTMAPS);
 		}
 		
 		// ================================
 		// LIGHTGRID
+
+		using LightgridArray = std::span<Lightgrid const>;
 		
-		inline gsl::span<Lightgrid const> lightgrids() const {
+		inline LightgridArray lightgrids() const {
 			return get_data_span<Lightgrid const>(LumpIndex::LIGHTGRID);
 		}
 		
@@ -191,20 +213,24 @@ namespace BSP {
 		
 		struct Visibility {
 			VisibilityHeader const & header;
-			gsl::span<uint8_t const> data;
-		};
-		
-		struct VisibilityCluster {
-			gsl::span<uint8_t const> data;
-			
-			inline bool can_see(int32_t other_cluster) {
-				// (other_cluster >> 3) determines which byte that cluster is in
-				// (1 << (other_cluster & 7)) determines which bit of that byte is the vis for that cluster
-				// this function is basically a faster way to do the following:
-				//     size_t cluster_byte = other_cluster / 8;
-				//     size_t cluster_bit  = other_cluster % 8;
-				//     return data[cluster_byte] & (1 << cluster_bit);
-				return data[other_cluster >> 3] & (1 << (other_cluster & 7));
+			std::span<uint8_t const> data;
+
+			struct Cluster {
+				std::span<uint8_t const> data;
+
+				inline bool can_see(int32_t other_cluster) const {
+					// (other_cluster >> 3) determines which byte that cluster is in
+					// (1 << (other_cluster & 7)) determines which bit of that byte is the vis for that cluster
+					// this function is basically a faster way to do the following:
+					//     size_t cluster_byte = other_cluster / 8;
+					//     size_t cluster_bit  = other_cluster % 8;
+					//     return data[cluster_byte] & (1 << cluster_bit);
+					return data[other_cluster >> 3] & (1 << (other_cluster & 7));
+				}
+			};
+
+			inline Cluster cluster(int32_t idx) const {
+				return Cluster { std::span<uint8_t const> { data.data() + header.cluster_bytes * idx, static_cast<size_t>(header.cluster_bytes) }};
 			}
 		};
 		
@@ -215,15 +241,12 @@ namespace BSP {
 			};
 		}
 		
-		inline VisibilityCluster visibility_cluster(int32_t idx) const {
-			auto vis = visibility();
-			return VisibilityCluster { gsl::span<uint8_t const> { vis.data.data() + vis.header.cluster_bytes * idx, vis.header.cluster_bytes }};
-		}
-		
 		// ================================
 		// LIGHTARRAY
+
+		using LightArray = std::span<uint16_t const>;
 		
-		inline gsl::span<uint16_t const> lightarray() const {
+		inline LightArray lightarray() const {
 			return get_data_span<uint16_t const>(LumpIndex::LIGHTARRAY);
 		}
 		

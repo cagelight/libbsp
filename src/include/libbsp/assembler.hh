@@ -64,4 +64,25 @@ namespace BSP {
 		std::shared_ptr<BSPI::EntityArray> ents;
 	};
 	
+	struct BSPIShaderArrayLumpProvider : public LumpProvider {
+		BSPIShaderArrayLumpProvider() = delete;
+		inline BSPIShaderArrayLumpProvider(std::shared_ptr<BSPI::ShaderArray> const & shaders) : shaders(shaders) {}
+		inline BSPI::ByteArray generate_lump(LumpIndex idx) override {
+			if (idx != LumpIndex::SHADERS) throw UnprovidableLumpException(idx);
+			return shaders->serialize();
+		}
+	private:
+		std::shared_ptr<BSPI::ShaderArray> shaders;
+	};
+	
+	struct BSPISurfaceArrayLumpProvider : public LumpProvider {
+		BSPISurfaceArrayLumpProvider() = delete;
+		inline BSPISurfaceArrayLumpProvider(std::shared_ptr<BSPI::SurfaceArray> const & surfaces) : surfaces(surfaces) {}
+		inline BSPI::ByteArray generate_lump(LumpIndex idx) override {
+			if (idx != LumpIndex::SURFACES) throw UnprovidableLumpException(idx);
+			return surfaces->serialize();
+		}
+	private:
+		std::shared_ptr<BSPI::SurfaceArray> surfaces;
+	};
 }

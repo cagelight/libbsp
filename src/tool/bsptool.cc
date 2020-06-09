@@ -14,6 +14,7 @@
 #include <map>
 #include <string>
 #include <unordered_map>
+#include <filesystem>
 
 int main(int argc, char * * argv) {
 	
@@ -24,7 +25,14 @@ int main(int argc, char * * argv) {
 		{ "ents",      { "-E", "--ents" }, "Print information about the entities", 0 },
 		{ "shaders",   { "-s", "--shaders" }, "Print the shaders used", 0 },
 		{ "shaders+",  { "-S", "--shaders-extra" }, "Print the shaders used plus extra information", 0 },
-		{ "reprocess", { "-r", "--reprocess" }, "Load the BSP and resave it", 1 },
+		{ "reprocess", { "-r", "--reprocess" }, "Load the BSP and resave it", 0 },
+		{ "output",    { "-o", "--output" }, "Output path for saving operations", 1 },
+		
+		{ "shsurfs",   { "--shader-surfaces" }, "<shader>", 0 },
+		{ "remap",     { "--remap" }, "<idx to remap>, requires --src, --dst, and -o to be specified", 1 },
+		
+		{ "src",       { "--src" }, "<source shader name>", 1 },
+		{ "dst",       { "--dst" }, "<dest shader name>", 1 },
 	}};
 	
 	argagg::parser_results args;
@@ -36,34 +44,60 @@ int main(int argc, char * * argv) {
 		return 1;
 	}
 	
+	// ================================
+	// HELP
+	// ================================
+	
 	if (args["help"] || !args.count()) {
 		std::cerr << "Usage: bsptool [options] <path to bsp>" << std::endl << argp;
 		return 0;
 	}
 	
-	std::string bsp_path = args.as<std::string>(0);
-	auto fd = open( bsp_path.c_str(), O_RDONLY );
+	// ================================
+	// SETUP
+	// ================================
 	
-	if (fd == -1) {
+	std::string bsp_path = args.as<std::string>(0);
+	
+	std::string output_path;
+	if (args["output"])
+		output_path = args["output"].as<std::string>();
+	
+	auto fdr = open( bsp_path.c_str(), O_RDONLY );
+	
+	if (fdr == -1) {
 		std::cerr << "File not found!" << std::endl;
 		return 1;
 	}
 	
 	struct stat sb;
-	fstat(fd, &sb);
+	fstat(fdr, &sb);
 	
 	if (sb.st_size < (ssize_t)sizeof(BSP::Header)) {
 		std::cerr << "File too small to be a BSP file!" << std::endl;
 		return 1;
 	}
 
-	auto ptr = mmap(nullptr, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-	BSP::Reader bspr { reinterpret_cast<uint8_t const *> (ptr) };
+	BSP::Reader bspr;
+	std::vector<uint8_t> rdat;
+	
+	if (!std::filesystem::equivalent(bsp_path, output_path))
+		bspr.rebase(reinterpret_cast<uint8_t const *> (mmap(nullptr, sb.st_size, PROT_READ, MAP_PRIVATE, fdr, 0)));
+	else {
+		rdat.resize(sb.st_size);
+		read(fdr, rdat.data(), sb.st_size);
+		close(fdr);
+		bspr.rebase(rdat.data());
+	}
 	
 	if (bspr.header().ident != BSP::IDENT) {
 		std::cerr << "File does not appear to be a BSP file!" << std::endl;
 		return 1;
 	}
+	
+	// ================================
+	// INFO
+	// ================================
 	
 	if (args["info"]) {
 		
@@ -178,10 +212,18 @@ int main(int argc, char * * argv) {
 		;
 	}
 	
+	// ================================
+	// ENTSTR
+	// ================================
+	
 	if (args["entstr"]) {
 		std::cout << bspr.entities();
 		std::flush(std::cout);
 	}
+	
+	// ================================
+	// ENTS
+	// ================================
 	
 	if (args["ents"]) {
 		auto ents = bspr.entities_parsed();
@@ -207,9 +249,17 @@ int main(int argc, char * * argv) {
 		}
 	}
 	
+	// ================================
+	// SHADERS
+	// ================================
+	
 	if (args["shaders"]) {
 		for (auto const & shad : bspr.shaders()) std::cout << shad.shader << std::endl;
 	}
+	
+	// ================================
+	// SHADERS+
+	// ================================
 	
 	if (args["shaders+"]) {
 		
@@ -224,7 +274,7 @@ int main(int argc, char * * argv) {
 		std::unordered_map<int32_t, uint32_t> surface_usage;
 		for (auto const & v : bspr.surfaces()) surface_usage[v.shader]++;
 		
-		for (ssize_t i = 0; i < shads.size(); i++) {
+		for (size_t i = 0; i < shads.size(); i++) {
 			auto const & shad = shads[i];
 			std::cout 
 				<< "Shader Path:     " << shad.shader 
@@ -247,6 +297,10 @@ int main(int argc, char * * argv) {
 		}
 	}
 	
+	// ================================
+	// REPROCESS
+	// ================================
+	
 	if (args["reprocess"]) {
 		BSP::LumpProviderPtr pprov = std::make_shared<BSP::BSPReaderLumpProvider>(bspr);
 		BSP::Assembler bspa { pprov };
@@ -259,6 +313,96 @@ int main(int argc, char * * argv) {
 		}
 		f.write( reinterpret_cast<char const *>(bytes.data()), bytes.size());
 		f.close();
+	}
+	
+	// ================================
+	// SHSURFS
+	// ================================
+	
+	if (args["shsurfs"]) {
+		meadow::istring src = meadow::s2i(args["src"].as<std::string>());
+		std::vector<BSP::Surface const *> matchsurfs;
+		for (BSP::Surface const & surf : bspr.surfaces())
+			if (bspr.shaders()[surf.shader].shader == src) matchsurfs.emplace_back(&surf);
+		for (size_t i = 0; i < matchsurfs.size(); i++) {
+			BSP::Surface const & surf = *matchsurfs[i];
+			std::cout
+				<< "[" << i << "] "
+				<< "Vertices: " << surf.vert_count
+			<< std::endl;
+		}
+	}
+	
+	// ================================
+	// REMAP
+	// ================================
+	
+	if (args["remap"]) {
+		meadow::istring src = meadow::s2i(args["src"].as<std::string>());
+		meadow::istring dst = meadow::s2i(args["dst"].as<std::string>());
+		int32_t idx = args["remap"].as<int32_t>();
+		
+		if (!output_path.size()) {
+			return 1;
+		}
+		
+		if (idx < -1) return 1;
+		
+		BSP::LumpProviderPtr pprov = std::make_shared<BSP::BSPReaderLumpProvider>(bspr);
+		BSP::Assembler bspa { pprov };
+		
+		std::shared_ptr<BSPI::ShaderArray> shaders = std::make_shared<BSPI::ShaderArray>(bspr.shaders());
+		bspa[BSP::LumpIndex::SHADERS] = std::make_shared<BSP::BSPIShaderArrayLumpProvider>(shaders);
+		std::shared_ptr<BSPI::SurfaceArray> surfaces = std::make_shared<BSPI::SurfaceArray>(bspr.surfaces());
+		bspa[BSP::LumpIndex::SURFACES] = std::make_shared<BSP::BSPISurfaceArrayLumpProvider>(surfaces);
+		
+		auto shiter = std::find_if(shaders->begin(), shaders->end(), [&](BSPI::Shader const & v){ return src == v.path; });
+		if (shiter == shaders->end()) {
+			std::cerr << "source shader not found in BSP" << std::endl;
+			return 1;
+		}
+		
+		if (idx == -1) {
+			
+			shiter->path = dst;
+			
+		} else {
+		
+			int32_t shsrc = std::distance(shaders->begin(), shiter);
+			int32_t shdst = 0;
+			
+			shiter = std::find_if(shaders->begin(), shaders->end(), [&](BSPI::Shader const & v){ return dst == v.path; });
+			if (shiter == shaders->end()) {
+				shdst = shaders->size();
+				shaders->emplace_back( BSPI::Shader { dst, shaders->at(shsrc).surface_flags, shaders->at(shsrc).content_flags } );
+			}
+			else
+				shdst = std::distance(shaders->begin(), shiter);
+			
+			std::cout << "Source Shader Index: " << shsrc << ", Dest Shader Index: " << shdst << std::endl;
+			
+			std::vector<BSP::Surface *> matchsurfs;
+			for (BSP::Surface & surf : *surfaces)
+				if (surf.shader == shsrc) matchsurfs.emplace_back(&surf);
+				
+			if (idx >= (int32_t)matchsurfs.size()) {
+				std::cerr << "remap index greater than match surfaces" << std::endl;
+				return 1;
+			}
+			
+			matchsurfs[idx]->shader = shdst;
+		
+		}
+		
+		auto bytes = bspa.assemble();
+		
+		std::ofstream fout { output_path, std::ios_base::binary | std::ios_base::out };
+		if (!fout.good()) {
+			std::cerr << "failed to open output for writing" << std::endl;
+			return 1;
+		}
+		fout.write( reinterpret_cast<char const *>(bytes.data()), bytes.size());
+		fout.close();
 	}
 	
 	return 0;
