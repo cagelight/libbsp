@@ -64,15 +64,45 @@ namespace BSP {
 		std::shared_ptr<BSPI::EntityArray> ents;
 	};
 	
-	struct BSPIShaderArrayLumpProvider : public LumpProvider {
-		BSPIShaderArrayLumpProvider() = delete;
-		inline BSPIShaderArrayLumpProvider(std::shared_ptr<BSPI::ShaderArray> const & shaders) : shaders(shaders) {}
+	template <typename T, LumpIndex IDX>
+	struct BSPIGenericLumpProvider : public LumpProvider {
+		BSPIGenericLumpProvider() = delete;
+		inline BSPIGenericLumpProvider(std::shared_ptr<T> const & value) : value(value) {}
 		inline BSPI::ByteArray generate_lump(LumpIndex idx) override {
-			if (idx != LumpIndex::SHADERS) throw UnprovidableLumpException(idx);
-			return shaders->serialize();
+			if (idx != IDX) throw UnprovidableLumpException(idx);
+			return value->serialize();
 		}
 	private:
-		std::shared_ptr<BSPI::ShaderArray> shaders;
+		std::shared_ptr<T> value;
+	};
+	
+	using BSPIShaderArrayLumpProvider = BSPIGenericLumpProvider<BSPI::ShaderArray, LumpIndex::SHADERS>;
+	using BSPILeafArrayLumpProvider = BSPIGenericLumpProvider<BSPI::LeafArray, LumpIndex::LEAFS>;
+	using BSPILeafSurfacesArrayLumpProvider = BSPIGenericLumpProvider<BSPI::LeafSurfaceArray, LumpIndex::LEAFSURFACES>;
+	using BSPIModelArrayLumpProvider = BSPIGenericLumpProvider<BSPI::ModelArray, LumpIndex::MODELS>;
+	using BSPIBrushArrayLumpProvider = BSPIGenericLumpProvider<BSPI::BrushArray, LumpIndex::BRUSHES>;
+	using BSPIBrushSidesArrayLumpProvider = BSPIGenericLumpProvider<BSPI::BrushSideArray, LumpIndex::BRUSHSIDES>;
+	
+	struct BSPIVertexArrayLumpProvider : public LumpProvider {
+		BSPIVertexArrayLumpProvider() = delete;
+		inline BSPIVertexArrayLumpProvider(std::shared_ptr<BSPI::VertexArray> const & vertices) : vertices(vertices) {}
+		inline BSPI::ByteArray generate_lump(LumpIndex idx) override {
+			if (idx != LumpIndex::DRAWVERTS) throw UnprovidableLumpException(idx);
+			return vertices->serialize();
+		}
+	private:
+		std::shared_ptr<BSPI::VertexArray> vertices;
+	};
+	
+	struct BSPIIndexArrayLumpProvider : public LumpProvider {
+		BSPIIndexArrayLumpProvider() = delete;
+		inline BSPIIndexArrayLumpProvider(std::shared_ptr<BSPI::IndexArray> const & indices) : indices(indices) {}
+		inline BSPI::ByteArray generate_lump(LumpIndex idx) override {
+			if (idx != LumpIndex::DRAWINDEXES) throw UnprovidableLumpException(idx);
+			return indices->serialize();
+		}
+	private:
+		std::shared_ptr<BSPI::IndexArray> indices;
 	};
 	
 	struct BSPISurfaceArrayLumpProvider : public LumpProvider {
@@ -84,5 +114,16 @@ namespace BSP {
 		}
 	private:
 		std::shared_ptr<BSPI::SurfaceArray> surfaces;
+	};
+	
+	struct BSPILightmapArrayLumpProvider : public LumpProvider {
+		BSPILightmapArrayLumpProvider() = delete;
+		inline BSPILightmapArrayLumpProvider(std::shared_ptr<BSPI::LightmapArray> const & lightmaps) : lightmaps(lightmaps) {}
+		inline BSPI::ByteArray generate_lump(LumpIndex idx) override {
+			if (idx != LumpIndex::LIGHTMAPS) throw UnprovidableLumpException(idx);
+			return lightmaps->serialize();
+		}
+	private:
+		std::shared_ptr<BSPI::LightmapArray> lightmaps;
 	};
 }

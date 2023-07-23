@@ -4,15 +4,16 @@
 
 #include <array>
 #include <limits>
+#include <new>
 
 namespace BSP {
 	
-	struct alignas(8) Lump {
+	struct Lump {
 		int32_t offs; // pointer offset from the BSP header
 		int32_t size; // size of lump
 	};
 	static_assert(sizeof(Lump) == 8);
-	struct alignas(8) Header {
+	struct Header {
 
 		ident_t              ident;   // see IDENT, checked to make sure file is a BSP file
 		int32_t              version; // see VERSION, no other versions are known
@@ -20,27 +21,27 @@ namespace BSP {
 	};
 	static_assert(sizeof(Header) == 152);
 	
-	struct alignas(8) Shader {
+	struct Shader {
 		char    shader[PATH_LENGTH]; // path of shader relative to the Q3 VFS
 		int32_t surface_flags;       // surface flags, usually taken from the shader
 		int32_t content_flags;       // content flags, usually taken from the shader
 	};
 	static_assert(sizeof(Shader) == 72);
 	
-	struct alignas(16) Plane {
+	struct Plane {
 		float normal[3]; // normal vector of the plane
 		float dist;      // distance from the origin
 	};
 	static_assert(sizeof(Plane) == 16);
 	
-	struct alignas(4) Node {
+	struct Node {
 		int32_t plane;            // LumpIndex::PLANES 
 		int32_t children[2];      // LumpIndex::NODES if >= 0, else LumpIndex::LEAFS (negate and subtract 1)
 		int32_t mins[3], maxs[3]; // bounds
 	};
 	static_assert(sizeof(Node) == 36);
 	
-	struct alignas(16) Leaf {
+	struct Leaf {
 		int32_t cluster;                     // LumpIndex::VISIBILITY (if present)
 		int32_t area;                        // area index
 		int32_t mins[3], maxs[3];            // bounds
@@ -49,27 +50,27 @@ namespace BSP {
 	};
 	static_assert(sizeof(Leaf) == 48);
 	
-	struct alignas(8) Model {
+	struct Model {
 		float   mins[3], maxs[3];            // bounds
 		int32_t	first_surface, num_surfaces; // LumpIndex::SURFACES
 		int32_t	first_brush, num_brushes;    // LumpIndex::BRUSHES
 	};
 	static_assert(sizeof(Model) == 40);
 
-	struct alignas(4) Brush {
+	struct Brush {
 		int32_t first_side, num_sides; // LumpIndex::BRUSHSIDES
 		int32_t shader;                // LumpIndex::SHADERS
 	};
 	static_assert(sizeof(Brush) == 12);
 	
-	struct alignas(4) BrushSide {
+	struct BrushSide {
 		int32_t plane;   // LumpIndex::PLANES 
 		int32_t shader;  // LumpIndex::SHADERS
 		int32_t surface; // UNUSED -- writen by q3map2 but unused by games, possibly refers to LumpIndex::SURFACES
 	};
 	static_assert(sizeof(BrushSide) == 12);
 	
-	struct alignas(16) DrawVert {
+	struct DrawVert {
 		float   pos[3];                   // XYZ coordinates
 		float   uv[2];                    // UV coordinates, shader
 		float   lightmap[LIGHTSTYLES][2]; // UV coordinates, lightmap, per-style
@@ -78,14 +79,14 @@ namespace BSP {
 	};
 	static_assert(sizeof(DrawVert) == 80);
 	
-	struct alignas(8) Fog {
+	struct Fog {
 		char    shader[PATH_LENGTH]; // path of shader relative to the Q3 VFS
 		int32_t brush;               // LumpIndex::BRUSH
 		int32_t visible_side;        // LumpIndex::BRUSHSIDE or -1 if none
 	};
 	static_assert(sizeof(Fog) == 72);
 	
-	struct alignas(4) Surface {
+	struct Surface {
 		int32_t     shader;                                           // LumpIndex::SHADERS
 		int32_t     fog;                                              // LumpIndex::FOGS
 		SurfaceType type;                                             // see the SurfaceType enum
@@ -105,17 +106,17 @@ namespace BSP {
 	};
 	static_assert(sizeof(Surface) == 148);
 	
-	struct alignas(1) Color {
+	struct Color {
 		uint8_t r, g, b;
 	};
 	static_assert(sizeof(Color) == 3);
 	
-	struct alignas(16384) Lightmap {
+	struct Lightmap {
 		Color pixels[LIGHTMAP_DIM][LIGHTMAP_DIM];
 	};
 	static_assert(sizeof(Lightmap) == LIGHTMAP_BYTES);
 	
-	struct alignas(2) Lightgrid {
+	struct Lightgrid {
 		Color   ambient[LIGHTSTYLES]; // ambient lighting
 		Color   direct[LIGHTSTYLES];  // direct lighting
 		uint8_t styles[LIGHTSTYLES];  // additive color styles
@@ -123,7 +124,7 @@ namespace BSP {
 	};
 	static_assert(sizeof(Lightgrid) == 30);
 	
-	struct alignas(8) VisibilityHeader {
+	struct VisibilityHeader {
 		int32_t clusters;      // number of clusters
 		int32_t cluster_bytes; // number of bytes per cluster, should be (clusters / 8) rounded up to the next 8-byte alignment
 		// (clusters * cluster_bytes) should be the same number of bytes in the visibility data

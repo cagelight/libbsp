@@ -45,7 +45,7 @@ namespace BSP {
 			Lump const & lump = get_lump(lump_num);
 			return std::string_view {
 				reinterpret_cast<char const *>(reinterpret_cast<uint8_t const *>(m_base) + lump.offs),
-				static_cast<size_t>(lump.size)
+				static_cast<size_t>(lump.size - 1)
 			};
 		}
 		
@@ -109,14 +109,18 @@ namespace BSP {
 		// ================================
 		// LEAFS
 		
-		inline std::span<Leaf const> leafs() const {
+		using LeafArray = std::span<Leaf const>;
+		
+		inline LeafArray leafs() const {
 			return get_data_span<Leaf const>(LumpIndex::LEAFS);
 		}
 		
 		// ================================
 		// LEAFSURFACES
 		
-		inline std::span<int32_t const> leafsurfaces() const {
+		using LeafSurfaceArray = std::span<int32_t const>;
+		
+		inline LeafSurfaceArray leafsurfaces() const {
 			return get_data_span<int32_t const>(LumpIndex::LEAFSURFACES);
 		}
 		
